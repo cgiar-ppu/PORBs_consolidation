@@ -15,7 +15,9 @@ PORB Excel File Consolidation Script v3
 import argparse
 import os
 import re
+import shutil
 import sys
+from datetime import datetime
 
 import pandas as pd
 from openpyxl import Workbook
@@ -120,6 +122,16 @@ def parse_args():
         "--input-dir",
         default=DEFAULT_INPUT_DIR,
         help="Directory containing Draft_PORB_*.xlsx files (default: PORBs subfolder)",
+    )
+    parser.add_argument(
+        "--date-tag",
+        default=datetime.now().strftime("%d%b%Y"),
+        help=(
+            "Date tag appended to the master filename, e.g. 06Jul2026 "
+            "(default: today). Matches the naming used by porb-analytics "
+            "(PORB_MASTER_All_Programs_<tag>.xlsx). The undated canonical "
+            "master is still written for existing consumers."
+        ),
     )
     return parser.parse_args()
 
@@ -398,8 +410,13 @@ def create_program_summary(program, files, porb_dir, output_dir):
     write_consolidated_file(output_path, sheet_data, program)
 
 
-def create_master_file(files, porb_dir, output_dir):
-    """Create master file with all programs combined."""
+def create_master_file(files, porb_dir, output_dir, date_tag=None):
+    """Create master file with all programs combined.
+
+    Writes the canonical undated master (for existing consumers) and, when a
+    date_tag is provided, a date-stamped copy PORB_MASTER_All_Programs_<tag>.xlsx
+    matching the naming convention used by porb-analytics.
+    """
     print("\n" + "-" * 60)
     print("Creating MASTER file (all programs)...")
     print("-" * 60)
@@ -424,6 +441,13 @@ def create_master_file(files, porb_dir, output_dir):
 
     output_path = os.path.join(output_dir, "PORB_MASTER_All_Programs.xlsx")
     write_consolidated_file(output_path, sheet_data, "MASTER")
+
+    if date_tag and os.path.exists(output_path):
+        dated_path = os.path.join(
+            output_dir, f"PORB_MASTER_All_Programs_{date_tag}.xlsx"
+        )
+        shutil.copyfile(output_path, dated_path)
+        print(f"  Saved: {dated_path} (date-stamped copy)")
 
 
 def main():
@@ -473,7 +497,7 @@ def main():
         create_program_summary(program, files, porb_dir, OUTPUT_DIR)
 
     # Master file with all programs
-    create_master_file(files, porb_dir, OUTPUT_DIR)
+    create_master_file(files, porb_dir, OUTPUT_DIR, date_tag=args.date_tag)
 
     print("\n" + "=" * 60)
     print("Consolidation complete!")
